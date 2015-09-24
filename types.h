@@ -20,6 +20,7 @@
 #define LIFX_LAN_MESSAGE_TYPE_GET_SERVICE 2
 #define LIFX_LAN_MESSAGE_TYPE_GET         101
 #define LIFX_LAN_MESSAGE_TYPE_SET_POWER   117
+#define LIFX_LAN_MESSAGE_TYPE_SET_COLOR   102
 
 #pragma pack(push ,1)
 struct lifx_lan_header
@@ -41,10 +42,27 @@ struct lifx_lan_header
     uint16_t :16; // reserved
 };
 
-struct lifx_lan_set_power_payload
+struct lifx_lan_set_power
 {
+    struct lifx_lan_header head;
     uint16_t level; // 0 or 65535
     uint32_t duration; // milliseconds
+};
+
+struct lifx_lan_color
+{
+    uint16_t hue;
+    uint16_t saturation;
+    uint16_t brightness;
+    uint16_t kelvin;
+};
+
+struct lifx_lan_set_color
+{
+    struct lifx_lan_header head;
+    uint8_t  reserved;
+    struct lifx_lan_color color;
+    uint32_t duration;
 };
 #pragma pack(pop)
 
