@@ -9,20 +9,35 @@
 #include <string.h>
 #include <unistd.h>
 
-#define LIFX_LAN_SOURCE_ID 0xBCBCBCBC
-#define LIFX_LAN_PROTOCOL 1024
-#define LIFX_LAN_SEND_PORT 56700
-#define LIFX_LAN_RECV_PORT 56750
-#define LIFX_LAN_SERVICE_UDP 1
-#define LIFX_LAN_LEVEL_POWERED_ON 65535
+#define LIFX_LAN_SOURCE_ID         0xBCBCBCBC
+#define LIFX_LAN_PROTOCOL          1024
+#define LIFX_LAN_SEND_PORT         56700
+#define LIFX_LAN_RECV_PORT         56750
+#define LIFX_LAN_SERVICE_UDP       1
+#define LIFX_LAN_LEVEL_POWERED_ON  65535
 #define LIFX_LAN_LEVEL_POWERED_OFF 0
 
-#define LIFX_LAN_MESSAGE_TYPE_GET_SERVICE 2
-#define LIFX_LAN_MESSAGE_TYPE_GET         101
-#define LIFX_LAN_MESSAGE_TYPE_SET_POWER   117
-#define LIFX_LAN_MESSAGE_TYPE_SET_COLOR   102
+#define LIFX_LAN_MESSAGE_TYPE_DEVICE_GET_SERVICE       2
+#define LIFX_LAN_MESSAGE_TYPE_DEVICE_GET_HOST_INFO     12
+#define LIFX_LAN_MESSAGE_TYPE_DEVICE_GET_HOST_FIRMWARE 14
+#define LIFX_LAN_MESSAGE_TYPE_DEVICE_GET_WIFI_INFO     16
+#define LIFX_LAN_MESSAGE_TYPE_DEVICE_GET_WIFI_FIRMWARE 18
+#define LIFX_LAN_MESSAGE_TYPE_DEVICE_GET_POWER         20
+#define LIFX_LAN_MESSAGE_TYPE_DEVICE_SET_POWER         21
+#define LIFX_LAN_MESSAGE_TYPE_DEVICE_GET_LABEL         23
+#define LIFX_LAN_MESSAGE_TYPE_DEVICE_SET_LABEL         24
+#define LIFX_LAN_MESSAGE_TYPE_DEVICE_GET_VERSION       32
+#define LIFX_LAN_MESSAGE_TYPE_DEVICE_GET_INFO          34
+#define LIFX_LAN_MESSAGE_TYPE_DEVICE_GET_LOCATION      48
+#define LIFX_LAN_MESSAGE_TYPE_DEVICE_GET_GROUP         51
+#define LIFX_LAN_MESSAGE_TYPE_DEVICE_ECHO_REQUEST      58
 
-#pragma pack(push ,1)
+#define LIFX_LAN_MESSAGE_TYPE_LIGHT_GET       101
+#define LIFX_LAN_MESSAGE_TYPE_LIGHT_SET_COLOR 102
+#define LIFX_LAN_MESSAGE_TYPE_LIGHT_GET_POWER 101
+#define LIFX_LAN_MESSAGE_TYPE_LIGHT_SET_POWER 117
+
+#pragma pack(push, 1)
 struct lifx_lan_header
 {
     uint16_t size; // size of entire message, including this field
@@ -42,11 +57,22 @@ struct lifx_lan_header
     uint16_t :16; // reserved
 };
 
-struct lifx_lan_set_power
+struct lifx_lan_device_set_power
 {
     struct lifx_lan_header head;
-    uint16_t level; // 0 or 65535
-    uint32_t duration; // milliseconds
+    uint16_t level;
+};
+
+struct lifx_lan_device_set_label
+{
+    struct lifx_lan_header head;
+    char   label[32];
+};
+
+struct lifx_lan_device_echo_request
+{
+    struct lifx_lan_header head;
+    uint8_t payload[64];
 };
 
 struct lifx_lan_color
@@ -57,12 +83,19 @@ struct lifx_lan_color
     uint16_t kelvin;
 };
 
-struct lifx_lan_set_color
+struct lifx_lan_light_set_color
 {
     struct lifx_lan_header head;
-    uint8_t  reserved;
+    uint8_t reserved;
     struct lifx_lan_color color;
-    uint32_t duration;
+    uint32_t duration_millis;
+};
+
+struct lifx_lan_light_set_power
+{
+    struct lifx_lan_header head;
+    uint16_t level; // 0 or 65535
+    uint32_t duration_millis;
 };
 #pragma pack(pop)
 
