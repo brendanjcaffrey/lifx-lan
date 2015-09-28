@@ -32,7 +32,7 @@ void lifx_lan_sender_device_get_group(struct lifx_lan_sender* s);
 void lifx_lan_sender_device_echo_request(struct lifx_lan_sender* s, void* buf);
 
 void lifx_lan_sender_light_get(struct lifx_lan_sender* s);
-void lifx_lan_sender_light_set_color(struct lifx_lan_sender* s, struct lifx_lan_color* color, uint32_t duration_millis);
+void lifx_lan_sender_light_set_color(struct lifx_lan_sender* s, struct lifx_lan_light_color* color, uint32_t duration_millis);
 void lifx_lan_sender_light_get_power(struct lifx_lan_sender* s);
 void lifx_lan_sender_light_set_power(struct lifx_lan_sender* s, bool powered_on, uint32_t duration_millis);
 
@@ -47,7 +47,7 @@ void lifx_lan_sender_init(struct lifx_lan_sender* s)
 
     memset(&s->addr, 0, sizeof(s->addr));
     s->addr.sin_family = AF_INET;
-    s->addr.sin_port = htons(LIFX_LAN_SEND_PORT);
+    s->addr.sin_port = htons(LIFX_LAN_PORT);
     s->addr.sin_addr.s_addr = htonl(-1);
 }
 
@@ -162,7 +162,7 @@ void lifx_lan_sender_light_get(struct lifx_lan_sender* s)
     lifx_lan_sender_send_(s, &msg, sizeof(msg));
 }
 
-void lifx_lan_sender_light_set_color(struct lifx_lan_sender* s, struct lifx_lan_color* color, uint32_t duration_millis)
+void lifx_lan_sender_light_set_color(struct lifx_lan_sender* s, struct lifx_lan_light_color* color, uint32_t duration_millis)
 {
     struct lifx_lan_light_set_color msg;
     lifx_lan_messages_encode_light_set_color(&s->messages, &msg, color, duration_millis);

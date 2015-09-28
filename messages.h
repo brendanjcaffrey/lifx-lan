@@ -31,10 +31,26 @@ void lifx_lan_messages_encode_device_echo_request(struct lifx_lan_messages* m,
 
 void lifx_lan_messages_encode_light_get(struct lifx_lan_messages* m, struct lifx_lan_header* msg);
 void lifx_lan_messages_encode_light_set_color(struct lifx_lan_messages* m, struct lifx_lan_light_set_color* msg,
-    struct lifx_lan_color* color, uint32_t duration_millis);
+    struct lifx_lan_light_color* color, uint32_t duration_millis);
 void lifx_lan_messages_encode_light_get_power(struct lifx_lan_messages* m, struct lifx_lan_header* msg);
 void lifx_lan_messages_encode_light_set_power(struct lifx_lan_messages* m, struct lifx_lan_light_set_power* msg,
     bool powered_on, uint32_t duration_millis);
+
+void lifx_lan_messages_decode_device_state_service(void* buf, size_t size, struct lifx_lan_device_state_service* out);
+void lifx_lan_messages_decode_device_state_host_info(void* buf, size_t size, struct lifx_lan_device_state_host_info* out);
+void lifx_lan_messages_decode_device_state_host_firmware(void* buf, size_t size, struct lifx_lan_device_state_host_firmware* out);
+void lifx_lan_messages_decode_device_state_wifi_info(void* buf, size_t size, struct lifx_lan_device_state_wifi_info* out);
+void lifx_lan_messages_decode_device_state_wifi_firmware(void* buf, size_t size, struct lifx_lan_device_state_wifi_firmware* out);
+void lifx_lan_messages_decode_device_state_power(void* buf, size_t size, struct lifx_lan_device_state_power* out);
+void lifx_lan_messages_decode_device_state_label(void* buf, size_t size, struct lifx_lan_device_state_label* out);
+void lifx_lan_messages_decode_device_state_version(void* buf, size_t size, struct lifx_lan_device_state_version* out);
+void lifx_lan_messages_decode_device_state_info(void* buf, size_t size, struct lifx_lan_device_state_info* out);
+void lifx_lan_messages_decode_device_state_location(void* buf, size_t size, struct lifx_lan_device_state_location* out);
+void lifx_lan_messages_decode_device_state_group(void* buf, size_t size, struct lifx_lan_device_state_group* out);
+void lifx_lan_messages_decode_device_echo_response(void* buf, size_t size, struct lifx_lan_device_echo_response* out);
+
+void lifx_lan_messages_decode_light_state(void* buf, size_t size, struct lifx_lan_light_state* out);
+void lifx_lan_messages_decode_light_state_power(void* buf, size_t size, struct lifx_lan_light_state_power* out);
 
 
 void lifx_lan_messages_init(struct lifx_lan_messages* m)
@@ -90,7 +106,7 @@ void lifx_lan_messages_encode_device_get_power(struct lifx_lan_messages* m, stru
 void lifx_lan_messages_encode_device_set_power(struct lifx_lan_messages* m,
     struct lifx_lan_device_set_power* msg, bool powered_on)
 {
-    lifx_lan_messages_encode_header(m, &msg->head, LIFX_LAN_MESSAGE_TYPE_DEVICE_SET_POWER, sizeof(*msg));
+    lifx_lan_messages_encode_header(m, &msg->header, LIFX_LAN_MESSAGE_TYPE_DEVICE_SET_POWER, sizeof(*msg));
     msg->level = powered_on ? LIFX_LAN_LEVEL_POWERED_ON : LIFX_LAN_LEVEL_POWERED_OFF;
 }
 
@@ -102,7 +118,7 @@ void lifx_lan_messages_encode_device_get_label(struct lifx_lan_messages* m, stru
 void lifx_lan_messages_encode_device_set_label(struct lifx_lan_messages* m,
     struct lifx_lan_device_set_label* msg, char* label)
 {
-    lifx_lan_messages_encode_header(m, &msg->head, LIFX_LAN_MESSAGE_TYPE_DEVICE_SET_LABEL, sizeof(*msg));
+    lifx_lan_messages_encode_header(m, &msg->header, LIFX_LAN_MESSAGE_TYPE_DEVICE_SET_LABEL, sizeof(*msg));
 
     assert(strlen(label) <= sizeof(msg->label));
     memset(msg->label, 0, sizeof(msg->label));
@@ -132,7 +148,7 @@ void lifx_lan_messages_encode_device_get_group(struct lifx_lan_messages* m, stru
 void lifx_lan_messages_encode_device_echo_request(struct lifx_lan_messages* m,
     struct lifx_lan_device_echo_request* msg, void* payload)
 {
-    lifx_lan_messages_encode_header(m, &msg->head, LIFX_LAN_MESSAGE_TYPE_DEVICE_ECHO_REQUEST, sizeof(*msg));
+    lifx_lan_messages_encode_header(m, &msg->header, LIFX_LAN_MESSAGE_TYPE_DEVICE_ECHO_REQUEST, sizeof(*msg));
     memcpy(msg->payload, payload, sizeof(msg->payload));
 }
 
@@ -143,10 +159,10 @@ void lifx_lan_messages_encode_light_get(struct lifx_lan_messages* m, struct lifx
 }
 
 void lifx_lan_messages_encode_light_set_color(struct lifx_lan_messages* m, struct lifx_lan_light_set_color* msg,
-    struct lifx_lan_color* color, uint32_t duration_millis)
+    struct lifx_lan_light_color* color, uint32_t duration_millis)
 {
-    lifx_lan_messages_encode_header(m, &msg->head, LIFX_LAN_MESSAGE_TYPE_LIGHT_SET_COLOR, sizeof(*msg));
-    memcpy(&msg->color, color, sizeof(struct lifx_lan_color));
+    lifx_lan_messages_encode_header(m, &msg->header, LIFX_LAN_MESSAGE_TYPE_LIGHT_SET_COLOR, sizeof(*msg));
+    memcpy(&msg->color, color, sizeof(struct lifx_lan_light_color));
     msg->duration_millis = duration_millis;
 }
 
@@ -161,6 +177,77 @@ void lifx_lan_messages_encode_light_set_power(struct lifx_lan_messages* m, struc
     lifx_lan_messages_encode_header(m, &msg->head, LIFX_LAN_MESSAGE_TYPE_LIGHT_SET_POWER, sizeof(*msg));
     msg->level = powered_on ? LIFX_LAN_LEVEL_POWERED_ON : LIFX_LAN_LEVEL_POWERED_OFF;
     msg->duration_millis = duration_millis;
+}
+
+
+void lifx_lan_messages_decode_device_state_service(void* buf, size_t size, struct lifx_lan_device_state_service* out)
+{
+    assert(size == sizeof(*out)); memcpy(out, buf, size);
+}
+
+void lifx_lan_messages_decode_device_state_host_info(void* buf, size_t size, struct lifx_lan_device_state_host_info* out)
+{
+    assert(size == sizeof(*out)); memcpy(out, buf, size);
+}
+
+void lifx_lan_messages_decode_device_state_host_firmware(void* buf, size_t size, struct lifx_lan_device_state_host_firmware* out)
+{
+    assert(size == sizeof(*out)); memcpy(out, buf, size);
+}
+
+void lifx_lan_messages_decode_device_state_wifi_info(void* buf, size_t size, struct lifx_lan_device_state_wifi_info* out)
+{
+    assert(size == sizeof(*out)); memcpy(out, buf, size);
+}
+
+void lifx_lan_messages_decode_device_state_wifi_firmware(void* buf, size_t size, struct lifx_lan_device_state_wifi_firmware* out)
+{
+    assert(size == sizeof(*out)); memcpy(out, buf, size);
+}
+
+void lifx_lan_messages_decode_device_state_power(void* buf, size_t size, struct lifx_lan_device_state_power* out)
+{
+    assert(size == sizeof(*out)); memcpy(out, buf, size);
+}
+
+void lifx_lan_messages_decode_device_state_label(void* buf, size_t size, struct lifx_lan_device_state_label* out)
+{
+    assert(size == sizeof(*out)); memcpy(out, buf, size);
+}
+
+void lifx_lan_messages_decode_device_state_version(void* buf, size_t size, struct lifx_lan_device_state_version* out)
+{
+    assert(size == sizeof(*out)); memcpy(out, buf, size);
+}
+
+void lifx_lan_messages_decode_device_state_info(void* buf, size_t size, struct lifx_lan_device_state_info* out)
+{
+    assert(size == sizeof(*out)); memcpy(out, buf, size);
+}
+
+void lifx_lan_messages_decode_device_state_location(void* buf, size_t size, struct lifx_lan_device_state_location* out)
+{
+    assert(size == sizeof(*out)); memcpy(out, buf, size);
+}
+
+void lifx_lan_messages_decode_device_state_group(void* buf, size_t size, struct lifx_lan_device_state_group* out)
+{
+    assert(size == sizeof(*out)); memcpy(out, buf, size);
+}
+
+void lifx_lan_messages_decode_device_echo_response(void* buf, size_t size, struct lifx_lan_device_echo_response* out)
+{
+    assert(size == sizeof(*out)); memcpy(out, buf, size);
+}
+
+void lifx_lan_messages_decode_light_state(void* buf, size_t size, struct lifx_lan_light_state* out)
+{
+    assert(size == sizeof(*out)); memcpy(out, buf, size);
+}
+
+void lifx_lan_messages_decode_light_state_power(void* buf, size_t size, struct lifx_lan_light_state_power* out)
+{
+    assert(size == sizeof(*out)); memcpy(out, buf, size);
 }
 
 #endif
