@@ -15,6 +15,7 @@
 #define LIFX_LAN_SERVICE_UDP       1
 #define LIFX_LAN_LEVEL_POWERED_ON  65535
 #define LIFX_LAN_LEVEL_POWERED_OFF 0
+#define LIFX_LAN_TARGET_ALL        0
 
 #define LIFX_LAN_MESSAGE_TYPE_DEVICE_GET_SERVICE         2
 #define LIFX_LAN_MESSAGE_TYPE_DEVICE_STATE_SERVICE       3
@@ -217,14 +218,14 @@ struct lifx_lan_light_state
 
 struct lifx_lan_light_set_power
 {
-    struct lifx_lan_header head;
+    struct lifx_lan_header header;
     uint16_t level; // 0 or 65535
     uint32_t duration_millis;
 };
 
 struct lifx_lan_light_state_power
 {
-    struct lifx_lan_header head;
+    struct lifx_lan_header header;
     uint16_t level; // 0 or 65535
 };
 #pragma pack(pop)
