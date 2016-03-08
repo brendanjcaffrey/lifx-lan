@@ -1,2 +1,2 @@
 mkdir -p bin
-clang main.c -o bin/lifx-lan
+gcc -std=c99 main.c -o bin/lifx-lan
