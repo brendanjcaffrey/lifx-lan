@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <signal.h>
 #include "../sender.h"
 #include "../receiver.h"
 
