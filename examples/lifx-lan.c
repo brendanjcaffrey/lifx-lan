@@ -1,7 +1,7 @@
 #include <stdio.h>
-#include "sender.h"
-#include "receiver.h"
-#include "color.h"
+#include "../sender.h"
+#include "../receiver.h"
+#include "../color.h"
 
 // checks that argv[1] starts with test
 #define ARG_IS(test) !memcmp(argv[1], test, strlen(test))
