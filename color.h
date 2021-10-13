@@ -25,7 +25,7 @@ void lifx_lan_color_white(struct lifx_lan_light_color* color, uint16_t brightnes
 
 void lifx_lan_color_white_kelvin(struct lifx_lan_light_color* color, uint16_t brightness, uint16_t kelvin)
 {
-    lifx_lan_color_hsbk(color, 0, 0, brightness, LIFX_LAN_KELVIN_DEFAULT);
+    lifx_lan_color_hsbk(color, 0, 0, brightness, kelvin);
 }
 
 void lifx_lan_color_hsb(struct lifx_lan_light_color* color, uint16_t h, uint16_t s, uint16_t b)
@@ -67,9 +67,9 @@ void lifx_lan_color_rgbk(struct lifx_lan_light_color* color, uint8_t red, uint8_
         hue *= (60.0/360.0);
     }
 
-    color->hue = hue * LIFX_LAN_HUE_MAX;
-    color->saturation = (max == 0 ? 0 : delta / max) * LIFX_LAN_SATURATION_MAX;
-    color->brightness = max * LIFX_LAN_BRIGHTNESS_MAX;
+    color->hue = (uint16_t) hue * LIFX_LAN_HUE_MAX;
+    color->saturation = (uint16_t) (max == 0 ? 0 : delta / max) * LIFX_LAN_SATURATION_MAX;
+    color->brightness = (uint16_t) max * LIFX_LAN_BRIGHTNESS_MAX;
     color->kelvin = kelvin;
 }
 
