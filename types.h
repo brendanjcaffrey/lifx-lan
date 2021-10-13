@@ -9,7 +9,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#define LIFX_LAN_SOURCE_ID         0
 #define LIFX_LAN_PROTOCOL          1024
 #define LIFX_LAN_PORT              56700
 #define LIFX_LAN_SERVICE_UDP       1

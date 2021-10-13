@@ -1,11 +1,13 @@
 #ifndef H_LIFX_LAN_MESSAGES_H
 #define H_LIFX_LAN_MESSAGES_H
 
+#include "time.h"
 #include "types.h"
 
 struct lifx_lan_messages
 {
     uint8_t seqnum;
+    uint32_t source_id;
 };
 
 void lifx_lan_messages_init(struct lifx_lan_messages* m);
@@ -71,7 +73,9 @@ void lifx_lan_messages_decode_light_state_power(void* buf, size_t size, struct l
 
 void lifx_lan_messages_init(struct lifx_lan_messages* m)
 {
-    m->seqnum = 0;
+    srand(time(NULL));
+    m->seqnum = rand();
+    m->source_id = rand();
 }
 
 void lifx_lan_messages_encode_header(struct lifx_lan_messages* m, struct lifx_lan_header* head,
@@ -83,7 +87,7 @@ void lifx_lan_messages_encode_header(struct lifx_lan_messages* m, struct lifx_la
     head->size = msg_size;
     head->protocol = LIFX_LAN_PROTOCOL;
     head->addressable = 1;
-    head->source = LIFX_LAN_SOURCE_ID;
+    head->source = m->source_id;
     head->sequence = m->seqnum++;
     head->type = message_type;
     head->res_required = 1;

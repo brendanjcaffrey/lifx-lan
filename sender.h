@@ -1,20 +1,17 @@
 #ifndef H_LIFX_LAN_SENDER_H
 #define H_LIFX_LAN_SENDER_H
 
-#include <sys/socket.h>
-#include "types.h"
 #include "messages.h"
+#include "socket.h"
 
 struct lifx_lan_sender
 {
+    struct lifx_lan_socket* socket;
     struct lifx_lan_messages messages;
-
-    int fd;
-    struct sockaddr_in addr;
+    struct sockaddr_in broadcast_addr;
 };
 
-void lifx_lan_sender_init(struct lifx_lan_sender* s);
-void lifx_lan_sender_uninit(struct lifx_lan_sender* s);
+void lifx_lan_sender_init(struct lifx_lan_sender* s, struct lifx_lan_socket* socket);
 
 void lifx_lan_sender_device_get_service(struct lifx_lan_sender* s);
 void lifx_lan_sender_device_get_host_info(struct lifx_lan_sender* s, uint64_t target);
@@ -40,22 +37,14 @@ void lifx_lan_sender_light_set_power(struct lifx_lan_sender* s, uint64_t target,
 
 void lifx_lan_sender_send_(struct lifx_lan_sender* s, void* msg, size_t msg_size);
 
-void lifx_lan_sender_init(struct lifx_lan_sender* s)
+void lifx_lan_sender_init(struct lifx_lan_sender* s, struct lifx_lan_socket* socket)
 {
-    assert((s->fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) != -1);
+    s->socket = socket;
 
-    int bcast_enable = 1;
-    assert(setsockopt(s->fd, SOL_SOCKET, SO_BROADCAST, &bcast_enable, sizeof(bcast_enable)) == 0);
-
-    memset(&s->addr, 0, sizeof(s->addr));
-    s->addr.sin_family = AF_INET;
-    s->addr.sin_port = htons(LIFX_LAN_PORT);
-    s->addr.sin_addr.s_addr = htonl(-1);
-}
-
-void lifx_lan_sender_uninit(struct lifx_lan_sender* s)
-{
-    close(s->fd);
+    memset(&s->broadcast_addr, 0, sizeof(s->broadcast_addr));
+    s->broadcast_addr.sin_family = AF_INET;
+    s->broadcast_addr.sin_port = htons(LIFX_LAN_PORT);
+    s->broadcast_addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
 }
 
 void lifx_lan_sender_device_get_service(struct lifx_lan_sender* s)
@@ -189,8 +178,7 @@ void lifx_lan_sender_light_set_power(struct lifx_lan_sender* s, uint64_t target,
 
 void lifx_lan_sender_send_(struct lifx_lan_sender* s, void* msg, size_t msg_size)
 {
-    assert(sendto(s->fd, msg, msg_size, 0, (struct sockaddr*) &s->addr,
-           sizeof(struct sockaddr_in)) == msg_size);
+    assert(sendto(s->socket->fd, msg, msg_size, 0, (struct sockaddr*) &s->broadcast_addr, sizeof(s->broadcast_addr)) == msg_size);
 }
 
 #endif

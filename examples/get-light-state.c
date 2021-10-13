@@ -1,24 +1,24 @@
 #include <stdio.h>
 #include <signal.h>
 #include "../sender.h"
-#include "../receiver.h"
 
 void receive_callback(uint16_t type, void* buf, size_t size);
 void alarm_callback(int sig);
 
 int main(void)
 {
-    struct lifx_lan_sender s;
-    lifx_lan_sender_init(&s);
-    lifx_lan_sender_light_get(&s, LIFX_LAN_TARGET_ALL);
-    lifx_lan_sender_uninit(&s);
+    struct lifx_lan_socket socket;
+    lifx_lan_socket_init(&socket);
+
+    struct lifx_lan_sender sender;
+    lifx_lan_sender_init(&sender, &socket);
+    lifx_lan_sender_light_get(&sender, LIFX_LAN_TARGET_ALL);
 
     signal(SIGALRM, &alarm_callback);
     alarm(3);
 
-    struct lifx_lan_receiver r;
-    lifx_lan_receiver_init(&r);
-    lifx_lan_receiver_receive(&r, &receive_callback);
+    lifx_lan_socket_receive(&socket, &receive_callback);
+    lifx_lan_socket_uninit(&socket);
 }
 
 void receive_callback(uint16_t type, void* buf, size_t size)
