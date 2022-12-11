@@ -179,14 +179,14 @@ void receive_callback(uint16_t type, void* buf, size_t size)
     case LIFX_LAN_MESSAGE_TYPE_LIGHT_STATE:;
         struct lifx_lan_light_state state;
         lifx_lan_messages_decode_light_state(buf, size, &state);
-        printf("STATE: target(%llu) hue(%u) saturation(%u) brightness(%u) kelvin(%u) power(%u) label(%.*s)\n",
+        printf("LIGHT-STATE: target(%llu) hue(%u) saturation(%u) brightness(%u) kelvin(%u) power(%u) label(%.*s)\n",
             state.header.target, state.color.hue, state.color.saturation, state.color.brightness,
             state.color.kelvin, state.power, (int) sizeof(state.label), state.label);
         break;
     case LIFX_LAN_MESSAGE_TYPE_LIGHT_STATE_POWER:;
         struct lifx_lan_light_state state_power;
         lifx_lan_messages_decode_light_state(buf, size, &state_power);
-        printf("STATE-POWER-LIGHT: target(%llu) level(%u)\n", state.header.target, state.power);
+        printf("LIGHT-STATE-POWER: target(%llu) level(%u)\n", state.header.target, state.power);
         break;
 
     // ignore all outgoing messages

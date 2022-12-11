@@ -23,9 +23,10 @@ struct thread_data
 
 struct tracked_light
 {
-    uint64_t id;
+    uint64_t light_id;
     bool want_on;
-    bool change_unconfirmed;
+    struct lifx_lan_light_color want_color;
+    bool power_change_unconfirmed, color_change_unconfirmed;
     struct timespec last_sent;
 
     struct tracked_light* next;
@@ -33,18 +34,22 @@ struct tracked_light
 
 struct parsed_cmd
 {
-    uint64_t id;
-    bool want_on;
+    uint64_t light_id;
+    struct lifx_lan_light_color color;
+    bool want_on, want_color_change;
 };
 
 void* run_lifx_thread(void* thread_data);
 void process_lifx_msg(struct thread_data* data, struct lifx_lan_recv_result* result);
+void process_lifx_power_msg(struct thread_data* data, struct lifx_lan_recv_result* result);
+void process_lifx_light_msg(struct thread_data* data, struct lifx_lan_recv_result* result);
 void send_lifx_msgs(struct thread_data* data, struct lifx_lan_sender* sender);
+void send_lifx_light_msgs(struct lifx_lan_sender* sender, struct tracked_light* light, struct timespec* now);
 void* run_uds_thread(struct thread_data* data, char const* path);
 bool read_client_msg(int client_fd, struct parsed_cmd* cmd);
 void handle_client_cmd(struct thread_data* data, struct parsed_cmd* cmd);
 void get_now(struct timespec* ts);
-struct tracked_light* find_light(struct thread_data* data, uint64_t id);
+struct tracked_light* find_light(struct thread_data* data, uint64_t light_id);
 
 int main(int argc, char** argv)
 {
@@ -93,8 +98,16 @@ void* run_lifx_thread(void* arg0)
 
 void process_lifx_msg(struct thread_data* data, struct lifx_lan_recv_result* result)
 {
-    if (result->type != LIFX_LAN_MESSAGE_TYPE_DEVICE_STATE_POWER) { return; } // all we care about
+    switch (result->type)
+    {
+    case LIFX_LAN_MESSAGE_TYPE_DEVICE_STATE_POWER: process_lifx_power_msg(data, result); break;
+    case LIFX_LAN_MESSAGE_TYPE_LIGHT_STATE: process_lifx_light_msg(data, result); break;
+    default: break;
+    }
+}
 
+void process_lifx_power_msg(struct thread_data* data, struct lifx_lan_recv_result* result)
+{
     assert(pthread_mutex_lock(&data->mutex) == 0);
 
     struct lifx_lan_device_state_power power;
@@ -102,17 +115,46 @@ void process_lifx_msg(struct thread_data* data, struct lifx_lan_recv_result* res
     printf("STATE-POWER: target(%llu) level(%u)\n", power.header.target, power.level);
 
     struct tracked_light* light = find_light(data, power.header.target);
-    if (light->change_unconfirmed)
+    if (light && light->power_change_unconfirmed)
     {
         bool light_is_on = power.level != 0;
         if (light->want_on == light_is_on)
         {
             printf("light %llu confirmed %s\n", power.header.target, light_is_on ? "on" : "off");
-            light->change_unconfirmed = false;
+            light->power_change_unconfirmed = false;
         }
         else
         {
             printf("light %llu want %s but is %s\n", power.header.target, light->want_on ? "on" : "off", light_is_on ? "on" : "off");
+        }
+    }
+
+    assert(pthread_mutex_unlock(&data->mutex) == 0);
+}
+
+void process_lifx_light_msg(struct thread_data* data, struct lifx_lan_recv_result* result)
+{
+    assert(pthread_mutex_lock(&data->mutex) == 0);
+
+    struct lifx_lan_light_state state;
+    lifx_lan_messages_decode_light_state(result->buf, result->len, &state);
+    printf("LIGHT-STATE: target(%llu) hue(%u) saturation(%u) brightness(%u) kelvin(%u) power(%u) label(%.*s)\n",
+        state.header.target, state.color.hue, state.color.saturation, state.color.brightness,
+        state.color.kelvin, state.power, (int) sizeof(state.label), state.label);
+
+    struct tracked_light* light = find_light(data, state.header.target);
+    if (light && light->color_change_unconfirmed)
+    {
+        if (memcmp(&light->want_color, &state.color, sizeof(state.color)) == 0) // these are packed structs
+        {
+            printf("light %llu color confirmed\n", state.header.target);
+            light->color_change_unconfirmed = false;
+        }
+        else
+        {
+            printf("light %llu want %u/%u/%u/%u but is %u/%u/%u/%u\n", state.header.target,
+                light->want_color.hue, light->want_color.saturation, light->want_color.brightness, light->want_color.kelvin,
+                state.color.hue, state.color.saturation, state.color.brightness, state.color.kelvin);
         }
     }
 
@@ -124,25 +166,37 @@ void send_lifx_msgs(struct thread_data* data, struct lifx_lan_sender* sender)
     assert(pthread_mutex_lock(&data->mutex) == 0);
 
     struct timespec now; get_now(&now);
-
     struct tracked_light* light = data->lights;
     while (light != NULL)
     {
-        if (light->change_unconfirmed)
+        if (light->color_change_unconfirmed || light->power_change_unconfirmed)
         {
-            double since_sent = (now.tv_sec - light->last_sent.tv_sec) + (double) (now.tv_nsec - light->last_sent.tv_nsec) / 1E9;
-            if (since_sent > RESEND_SECONDS)
-            {
-                printf("light %llu want %s, sending\n", light->id, light->want_on ? "on" : "off");
-                lifx_lan_sender_device_set_power(sender, light->id, light->want_on);
-                light->last_sent = now;
-            }
+            send_lifx_light_msgs(sender, light, &now);
         }
-
         light = light->next;
     }
 
     assert(pthread_mutex_unlock(&data->mutex) == 0);
+}
+
+void send_lifx_light_msgs(struct lifx_lan_sender* sender, struct tracked_light* light, struct timespec* now)
+{
+    double since_sent = (now->tv_sec - light->last_sent.tv_sec) + (double) (now->tv_nsec - light->last_sent.tv_nsec) / 1E9;
+    if (since_sent > RESEND_SECONDS)
+    {
+        light->last_sent = *now;
+        if (light->color_change_unconfirmed)
+        {
+            struct lifx_lan_light_color* c = &light->want_color;
+            printf("light %llu want %u/%u/%u/%u, sending\n", light->light_id, c->hue, c->saturation, c->brightness, c->kelvin);
+            lifx_lan_sender_light_set_color(sender, light->light_id, &light->want_color, 0);
+        }
+        if (light->power_change_unconfirmed)
+        {
+            printf("light %llu want %s, sending\n", light->light_id, light->want_on ? "on" : "off");
+            lifx_lan_sender_device_set_power(sender, light->light_id, light->want_on);
+        }
+    }
 }
 
 void* run_uds_thread(struct thread_data* data, char const* path)
@@ -184,12 +238,12 @@ void handle_client_cmd(struct thread_data* data, struct parsed_cmd* cmd)
 {
     assert(pthread_mutex_lock(&data->mutex) == 0);
 
-    struct tracked_light* light = find_light(data, cmd->id);
+    struct tracked_light* light = find_light(data, cmd->light_id);
     if (light == NULL)
     {
         light = malloc(sizeof(struct tracked_light));
         bzero(light, sizeof(*light));
-        light->id = cmd->id;
+        light->light_id = cmd->light_id;
 
         light->next = data->lights;
         data->lights = light;
@@ -198,61 +252,103 @@ void handle_client_cmd(struct thread_data* data, struct parsed_cmd* cmd)
         assert(data->num_lights <= MAX_TRACKED_LIGHTS);
     }
 
-    light->change_unconfirmed = true;
+    light->power_change_unconfirmed = true;
     light->want_on = cmd->want_on;
     bzero(&light->last_sent, sizeof(light->last_sent));
+
+    if (cmd->want_color_change)
+    {
+        light->color_change_unconfirmed = true;
+        light->want_color = cmd->color;
+    }
 
     assert(pthread_mutex_unlock(&data->mutex) == 0);
 }
 
 bool read_client_msg(int client_fd, struct parsed_cmd* cmd)
 {
-    char buf[22]; bzero(buf, sizeof(buf)); // expecting a message like [id],1 which is max 21 chars
-    ssize_t len = read(client_fd, buf, sizeof(buf));
+#define POWER_MSG_TOKENS 2
+#define COLOR_MSG_TOKENS 6
+
+    char buf[51]; bzero(buf, sizeof(buf));
+    ssize_t len = read(client_fd, buf, sizeof(buf)-1); // leave the last character empty for null termination
     if (len < 3) { return false; }
 
-    char* comma = NULL;
-    for (int i = 0; i < len; ++i)
+    char orig[51]; memcpy(orig, buf, sizeof(buf));
+
+    size_t token_count = 0;
+    bzero(cmd, sizeof(*cmd));
+
+    char* strtok_context = NULL;
+    char* token = strtok_r(buf, ",", &strtok_context);
+    while (token != NULL)
     {
-        if (!isdigit(buf[i]))
+        if (token_count >= COLOR_MSG_TOKENS)
         {
-            // only allow 1 comma, not at the beginning or end
-            if (buf[i] == ',' && comma == NULL && i != 0 && i != len-1)
+            printf("unable to parse '%.*s', too many tokens\n", (int) len, orig);
+            return false;
+        }
+
+        if (strlen(token) == 0)
+        {
+            printf("unable to parse '%.*s', token %lu empty\n", (int) len, orig, token_count);
+            return false;
+        }
+        for (int i = 0; i < strlen(token); ++i)
+        {
+            if (!isdigit(token[i]))
             {
-                comma = buf + i;
-            }
-            else
-            {
-                printf("unable to parse '%.*s', invalid characters\n", (int) len, buf);
+                printf("unable to parse '%.*s', token %lu '%s' has non digits\n", (int) len, orig, token_count, token);
                 return false;
             }
         }
+
+        uint16_t* color_out = NULL;
+        switch (++token_count)
+        {
+        case 1:
+            cmd->light_id = strtoull(buf, NULL, 10);
+            if (cmd->light_id == 0 || cmd->light_id == ULLONG_MAX)
+            {
+                printf("unable to parse '%.*s', error converting light_id '%s'\n", (int) len, orig, token);
+                return false;
+            }
+            break;
+        case 2:
+            if (strlen(token) != 1 || (*token != '0' && *token != '1'))
+            {
+                printf("unable to parse '%.*s', invalid on/off value '%s'\n", (int) len, orig, token);
+                return false;
+            }
+            cmd->want_on = *token == '1';
+            break;
+        case 3: color_out = &cmd->color.hue; break;
+        case 4: color_out = &cmd->color.saturation; break;
+        case 5: color_out = &cmd->color.brightness; break;
+        case 6: color_out = &cmd->color.kelvin; break;
+        default: abort();
+        }
+
+        if (color_out != NULL) { *color_out = strtol(token, NULL, 10); }
+        token = strtok_r(NULL, ",", &strtok_context);
     }
 
-    if (comma == NULL || (comma - buf) != len-2)
+    if (token_count == POWER_MSG_TOKENS)
     {
-        printf("unable to parse '%.*s', missing or invalid comma\n", (int) len, buf);
+        printf("parsed '%.*s' to light_id=%llu want_on=%d\n", (int) len, orig, cmd->light_id, cmd->want_on);
+    }
+    else if (token_count == COLOR_MSG_TOKENS)
+    {
+        cmd->want_color_change = true;
+        struct lifx_lan_light_color* c = &cmd->color;
+        printf("parsed '%.*s' to light_id=%llu want_on=%d color=%d/%d/%d/%d\n", (int) len, orig, cmd->light_id, cmd->want_on, c->hue, c->saturation, c->brightness, c->kelvin);
+    }
+    else
+    {
+        printf("unable to parse '%.*s', invalid number of tokens %lu\n", (int) len, orig, token_count);
         return false;
     }
 
-    char on_off = *(comma+1);
-    if (on_off != '0' && on_off != '1')
-    {
-        printf("unable to parse '%.*s', invalid on/off value\n", (int) len, buf);
-        return false;
-    }
-    bool want_on = on_off == '1';
-
-    uint64_t id = strtoull(buf, NULL, 10);
-    if (id == 0 || id == ULLONG_MAX)
-    {
-        printf("unable to parse '%.*s', error converting id\n", (int) len, buf);
-        return false;
-    }
-
-    printf("parsed '%.*s' to id=%llu want_on=%d\n", (int) len, buf, id, want_on);
-    cmd->id = id;
-    cmd->want_on = want_on;
     return true;
 }
 
@@ -261,12 +357,12 @@ void get_now(struct timespec* ts)
     assert(clock_gettime(CLOCK_MONOTONIC, ts) == 0);
 }
 
-struct tracked_light* find_light(struct thread_data* data, uint64_t id)
+struct tracked_light* find_light(struct thread_data* data, uint64_t light_id)
 {
     struct tracked_light* light = data->lights;
     while (light != NULL)
     {
-        if (light->id == id) { return light; }
+        if (light->light_id == light_id) { return light; }
         light = light->next;
     }
 
