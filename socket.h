@@ -1,6 +1,8 @@
 #ifndef H_LIFX_LAN_SOCKET_H
 #define H_LIFX_LAN_SOCKET_H
 
+#include <sys/time.h>
+#include <strings.h>
 #include "types.h"
 
 struct lifx_lan_socket

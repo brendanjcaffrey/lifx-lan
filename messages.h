@@ -1,7 +1,7 @@
 #ifndef H_LIFX_LAN_MESSAGES_H
 #define H_LIFX_LAN_MESSAGES_H
 
-#include "time.h"
+#include <time.h>
 #include "types.h"
 
 struct lifx_lan_messages
