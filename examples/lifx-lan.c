@@ -6,7 +6,6 @@
 #define ARG_IS(test) !memcmp(argv[1], test, strlen(test))
 
 uint64_t extract_target(int argc, char** argv);
-void receive(struct lifx_lan_socket* socket);
 void receive_callback(uint16_t type, void* buf, size_t size);
 
 int main(int argc, char** argv)
@@ -28,41 +27,40 @@ int main(int argc, char** argv)
     struct lifx_lan_light_color color;
 
     // device messages
-    if (ARG_IS("get-service")) { lifx_lan_sender_device_get_service(&sender); receive(&socket); }
-    else if (ARG_IS("get-host-info")) { lifx_lan_sender_device_get_host_info(&sender, target); receive(&socket); }
-    else if (ARG_IS("get-host-firmware")) { lifx_lan_sender_device_get_host_firmware(&sender, target); receive(&socket); }
-    else if (ARG_IS("get-wifi-info")) { lifx_lan_sender_device_get_wifi_info(&sender, target); receive(&socket); }
-    else if (ARG_IS("get-wifi-firmware")) { lifx_lan_sender_device_get_wifi_firmware(&sender, target); receive(&socket); }
-    else if (ARG_IS("get-power")) { lifx_lan_sender_device_get_power(&sender, target); receive(&socket); }
+    if (ARG_IS("get-service")) { lifx_lan_sender_device_get_service(&sender); }
+    else if (ARG_IS("get-host-info")) { lifx_lan_sender_device_get_host_info(&sender, target); }
+    else if (ARG_IS("get-host-firmware")) { lifx_lan_sender_device_get_host_firmware(&sender, target); }
+    else if (ARG_IS("get-wifi-info")) { lifx_lan_sender_device_get_wifi_info(&sender, target); }
+    else if (ARG_IS("get-wifi-firmware")) { lifx_lan_sender_device_get_wifi_firmware(&sender, target); }
+    else if (ARG_IS("get-power")) { lifx_lan_sender_device_get_power(&sender, target); }
     else if (ARG_IS("set-power") && arg_count == 3)
     {
         char on_off = argv[2][0]; assert(on_off == '1' || on_off == '0');
         lifx_lan_sender_device_set_power(&sender, target, on_off == '1');
     }
-    else if (ARG_IS("get-label")) { lifx_lan_sender_device_get_label(&sender, target); receive(&socket); }
+    else if (ARG_IS("get-label")) { lifx_lan_sender_device_get_label(&sender, target); }
     else if (ARG_IS("set-label") && arg_count == 3) { lifx_lan_sender_device_set_label(&sender, target, argv[2]); }
-    else if (ARG_IS("get-version")) { lifx_lan_sender_device_get_version(&sender, target); receive(&socket); }
-    else if (ARG_IS("get-info")) { lifx_lan_sender_device_get_info(&sender, target); receive(&socket); }
-    else if (ARG_IS("get-location")) { lifx_lan_sender_device_get_location(&sender, target); receive(&socket); }
-    else if (ARG_IS("get-group")) { lifx_lan_sender_device_get_group(&sender, target); receive(&socket); }
+    else if (ARG_IS("get-version")) { lifx_lan_sender_device_get_version(&sender, target); }
+    else if (ARG_IS("get-info")) { lifx_lan_sender_device_get_info(&sender, target); }
+    else if (ARG_IS("get-location")) { lifx_lan_sender_device_get_location(&sender, target); }
+    else if (ARG_IS("get-group")) { lifx_lan_sender_device_get_group(&sender, target); }
     else if (ARG_IS("echo-request"))
     {
         uint8_t buf[64];
         memset(buf, 0, sizeof(buf));
         memcpy(buf, "test echo request", 17);
         lifx_lan_sender_device_echo_request(&sender, target, buf);
-        receive(&socket);
     }
 
     // light messages
-    else if (ARG_IS("get")) { lifx_lan_sender_light_get(&sender, target); receive(&socket); }
+    else if (ARG_IS("get")) { lifx_lan_sender_light_get(&sender, target); }
     else if (ARG_IS("set-color"))
     {
         assert(arg_count == 7); // bin/lifx-lan set-color h sender b k duration
         lifx_lan_color_hsbk(&color, atoi(argv[2]), atoi(argv[3]), atoi(argv[4]), atoi(argv[5]));
         lifx_lan_sender_light_set_color(&sender, target, &color, atoi(argv[6]));
     }
-    else if (ARG_IS("get-power-light")) { lifx_lan_sender_light_get_power(&sender, target); receive(&socket); }
+    else if (ARG_IS("get-power-light")) { lifx_lan_sender_light_get_power(&sender, target); }
     else if (ARG_IS("set-power") && arg_count == 4)
     {
         char on_off = argv[2][0]; assert(on_off == '1' || on_off == '0');
@@ -71,6 +69,7 @@ int main(int argc, char** argv)
 
     else { fprintf(stderr, "Unrecognized command\n"); return 2; }
 
+    lifx_lan_socket_receive(&socket, &receive_callback);
     lifx_lan_socket_uninit(&socket);
     return 0;
 }
@@ -85,11 +84,6 @@ uint64_t extract_target(int argc, char** argv)
     {
         return LIFX_LAN_TARGET_ALL;
     }
-}
-
-void receive(struct lifx_lan_socket* socket)
-{
-    lifx_lan_socket_receive(socket, &receive_callback);
 }
 
 void receive_callback(uint16_t type, void* buf, size_t size)
