@@ -10,6 +10,7 @@
 #define LIFX_RECV_TIMEOUT_SEC 0
 #define LIFX_RECV_TIMEOUT_USEC 500
 #define RESEND_SECONDS 1.0
+#define GIVE_UP_SECONDS 300.0
 #define UDS_SERVER_BACKLOG 5
 #define UDS_RECV_TIMEOUT_SEC 1
 #define UDS_RECV_TIMEOUT_USEC 0
@@ -27,7 +28,7 @@ struct tracked_light
     bool want_on;
     struct lifx_lan_light_color want_color;
     bool power_change_unconfirmed, color_change_unconfirmed;
-    struct timespec last_sent;
+    struct timespec last_sent, last_cmd_rcvd;
 
     struct tracked_light* next;
 };
@@ -182,7 +183,8 @@ void send_lifx_msgs(struct thread_data* data, struct lifx_lan_sender* sender)
 void send_lifx_light_msgs(struct lifx_lan_sender* sender, struct tracked_light* light, struct timespec* now)
 {
     double since_sent = (now->tv_sec - light->last_sent.tv_sec) + (double) (now->tv_nsec - light->last_sent.tv_nsec) / 1E9;
-    if (since_sent > RESEND_SECONDS)
+    double since_cmd =  (now->tv_sec - light->last_cmd_rcvd.tv_sec) + (double) (now->tv_nsec - light->last_cmd_rcvd.tv_nsec) / 1E9;
+    if (since_sent > RESEND_SECONDS && since_cmd < GIVE_UP_SECONDS)
     {
         light->last_sent = *now;
         if (light->color_change_unconfirmed)
@@ -254,6 +256,7 @@ void handle_client_cmd(struct thread_data* data, struct parsed_cmd* cmd)
 
     light->power_change_unconfirmed = true;
     light->want_on = cmd->want_on;
+    get_now(&light->last_cmd_rcvd);
     bzero(&light->last_sent, sizeof(light->last_sent));
 
     if (cmd->want_color_change)
